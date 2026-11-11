@@ -13,10 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Baixar diário e enviar por e-mail
+      - name: Baixar diário e enviar ao Discord
         run: python3 diario.py
         env:
-          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
       - name: Salvar estado
         run: |
           git config user.name "bot-diario"
