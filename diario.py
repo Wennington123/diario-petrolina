@@ -1,15 +1,12 @@
 import json
 import os
 import re
-import smtplib
-import ssl
+import time
 import urllib.request
 from datetime import date, timedelta
-from email.message import EmailMessage
 from pathlib import Path
 
 CIDADE_URL = "pe/petrolina"
-DESTINO = "wenningtondiasx25@gmail.com"
 UA = {
     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0",
     "Accept": "application/pdf,text/html,*/*",
@@ -79,29 +76,29 @@ def salvar_state(ultimo):
 
 
 def enviar(pdfs):
-    msg = EmailMessage()
-    msg["From"] = DESTINO
-    msg["To"] = DESTINO
-    if len(pdfs) == 1:
-        msg["Subject"] = f"Diário Oficial Petrolina — Edição {pdfs[0][1]['edicao']} ({pdfs[0][1]['data']})"
-    else:
-        msg["Subject"] = f"Diário Oficial Petrolina — {len(pdfs)} edições novas"
-    msg.set_content(
-        "Diário(s) Oficial(is) de Petrolina anexado(s).\n"
-        "Fonte: https://doem.org.br/" + CIDADE_URL + "\n"
+    limite = "----diario" + str(int(time.time() * 1000))
+    nomes = ", ".join(f"edição {ed['edicao']} ({ed['data']})" for _, ed in pdfs)
+    corpo = (
+        f'--{limite}\r\n'
+        f'Content-Disposition: form-data; name="payload_json"\r\n'
+        f"Content-Type: application/json\r\n\r\n"
+        f'{json.dumps({"content": f"Diário Oficial Petrolina — {nomes}"})}\r\n'
+    ).encode()
+    for i, (nome, ed) in enumerate(pdfs):
+        corpo += (
+            f'--{limite}\r\n'
+            f'Content-Disposition: form-data; name="files[{i}]"; filename="{nome}"\r\n'
+            f"Content-Type: application/pdf\r\n\r\n"
+        ).encode()
+        corpo += ed["bytes"] + b"\r\n"
+    corpo += f"--{limite}--\r\n".encode()
+    req = urllib.request.Request(
+        os.environ["DISCORD_WEBHOOK_URL"],
+        data=corpo,
+        headers={"Content-Type": f"multipart/form-data; boundary={limite}"},
     )
-    for nome, ed in pdfs:
-        msg.add_attachment(
-            ed["bytes"],
-            maintype="application",
-            subtype="pdf",
-            filename=f"diario-petrolina-{ed['data']}.pdf",
-        )
-    ctx = ssl.create_default_context()
-    with smtplib.SMTP("smtp.gmail.com", 587) as smtp:
-        smtp.starttls(context=ctx)
-        smtp.login(DESTINO, os.environ["GMAIL_APP_PASSWORD"])
-        smtp.send_message(msg)
+    with urllib.request.urlopen(req, timeout=90) as resp:
+        resp.read()
 
 
 def main():
@@ -112,12 +109,12 @@ def main():
     for ed in pendentes:
         ed["bytes"] = get(ed["pdf"], binario=True)
         print(f"  baixada: edição {ed['edicao']} de {ed['data']} ({len(ed['bytes'])} bytes)")
-    if not os.environ.get("GMAIL_APP_PASSWORD"):
-        print("dry-run: GMAIL_APP_PASSWORD ausente, e-mail não enviado")
+    if not os.environ.get("DISCORD_WEBHOOK_URL"):
+        print("dry-run: DISCORD_WEBHOOK_URL ausente, envio não feito")
         return
-    enviar([(ed["data"], ed) for ed in pendentes])
+    enviar([(f"diario-petrolina-{ed['data']}.pdf", ed) for ed in pendentes])
     salvar_state(pendentes[-1]["data"])
-    print("e-mail enviado")
+    print("enviado ao Discord")
 
 
 if __name__ == "__main__":
