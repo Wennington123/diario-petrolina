@@ -2,7 +2,7 @@ name: diario-petrolina
 
 on:
   schedule:
-    - cron: "17 13 * * 1-5"
+    - cron: "7 20 * * 1-5"
   workflow_dispatch:
 
 permissions:
