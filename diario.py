@@ -95,7 +95,10 @@ def enviar(pdfs):
     req = urllib.request.Request(
         os.environ["DISCORD_WEBHOOK_URL"],
         data=corpo,
-        headers={"Content-Type": f"multipart/form-data; boundary={limite}"},
+        headers={
+            "Content-Type": f"multipart/form-data; boundary={limite}",
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0",
+        },
     )
     with urllib.request.urlopen(req, timeout=90) as resp:
         resp.read()
